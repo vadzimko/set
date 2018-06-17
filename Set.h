@@ -44,7 +44,7 @@ public:
     std::pair<iterator, bool> insert(T const& element);
     iterator erase(const_iterator it);
 
-    const_iterator find(T const& element) const;
+    iterator find(T const& element);
     const_iterator lower_bound(T const& element) const;
     const_iterator upper_bound(T const& element) const;
 
@@ -80,9 +80,7 @@ Set<T>::Set() noexcept {}
 template <typename T>
 Set<T>::Set(Set const& other) {
     top_node_.left = copy_impl(other.get_root(), &top_node_);
-    begin_ = top_node_.left;
-    if (begin_ == nullptr)
-        return;
+    begin_ = &top_node_;
 
     while(begin_->left != nullptr)
         begin_ = begin_->left;
@@ -113,7 +111,7 @@ typename Set<T>::Node *Set<T>::copy_impl(Node *other, Node *parent) {
 template <typename T>
 Set<T>& Set<T>::operator=(Set const &other) {
     Set temp(other);
-    swap(*this, temp);
+    swap(temp);
     return *this;
 }
 
@@ -228,10 +226,10 @@ void Set<T>::erase_impl(Node *node) {
 }
 
 template <typename T>
-typename Set<T>::const_iterator Set<T>::find(T const &element) const {
+typename Set<T>::iterator Set<T>::find(T const &element) {
     Node* node = upper_lower_impl(element);
     if (node != nullptr && node->value() == element) {
-        return const_iterator(node);
+        return iterator(node);
     }
     else return end();
 }
@@ -336,6 +334,9 @@ typename Set<T>::Node* Set<T>::Node::prev() {
 
 template <typename T>
 void Set<T>::swap(Set &other) {
+    if (top_node_.left == nullptr && other.top_node_.left == nullptr)
+        return;
+
     if (top_node_.left != nullptr && other.top_node_.left != nullptr) {
         std::swap(top_node_.left, other.top_node_.left);
         std::swap(top_node_.left->parent, other.top_node_.left->parent);
@@ -398,6 +399,7 @@ struct Set<T>::Iterator {
     }
 
     V& operator*() const { return node->value(); }
+    V* operator->() const { return &node->value(); }
     friend bool operator==(Iterator const& first, Iterator const& second) { return first.node == second.node; }
     friend bool operator!=(Iterator const& first, Iterator const& second) { return first.node != second.node; }
 
