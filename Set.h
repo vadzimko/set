@@ -36,15 +36,15 @@ public:
     Set &operator=(Set const& other);
     ~Set();
 
-    using iterator = Iterator<T>;
-    using const_iterator = Iterator<T const>;
+    using iterator = Iterator<T const>;
+    using const_iterator = iterator;
     using reverse_iterator = std::reverse_iterator<iterator>;
     using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     std::pair<iterator, bool> insert(T const& element);
     iterator erase(const_iterator it);
 
-    iterator find(T const& element);
+    const_iterator find(T const& element);
     const_iterator lower_bound(T const& element) const;
     const_iterator upper_bound(T const& element) const;
 
@@ -68,7 +68,6 @@ private:
     Node* begin_ = &top_node_;
     Node* get_root() const { return top_node_.left; }
 
-    Node* copy_impl(Node *other, Node *parent);
     void clear_impl(Node *node);
     void erase_impl(Node* node);
     Node* upper_lower_impl (T const& element) const;
@@ -79,11 +78,14 @@ Set<T>::Set() noexcept {}
 
 template <typename T>
 Set<T>::Set(Set const& other) {
-    top_node_.left = copy_impl(other.get_root(), &top_node_);
-    begin_ = &top_node_;
-
-    while(begin_->left != nullptr)
-        begin_ = begin_->left;
+    try {
+        for (auto &a : other) {
+            insert(a);
+        }
+    } catch (...) {
+        clear();
+        throw;
+    }
 }
 
 template <typename T>
@@ -94,18 +96,6 @@ void Set<T>::clear_impl(Node *node) {
     clear_impl(node->left);
     clear_impl(node->right);
     delete node;
-}
-
-template <typename T>
-typename Set<T>::Node *Set<T>::copy_impl(Node *other, Node *parent) {
-    if (other == nullptr)
-        return nullptr;
-
-    Node *node = new ValueNode(other->value());
-    node->left = copy_impl(other->left, node);
-    node->right = copy_impl(other->right, node);
-    node->parent = parent;
-    return node;
 }
 
 template <typename T>
@@ -164,14 +154,14 @@ typename Set<T>::iterator Set<T>::erase(const_iterator it) {
         return end();
 
     Node* node = it.node;
-    iterator *ret;
+    iterator ret;
     if (node->left != nullptr && node->right != nullptr)
-        ret = new iterator(node);
-    else ret = new iterator(node->next());
+        ret = iterator(node);
+    else ret = iterator(node->next());
 
     erase_impl(node);
 
-    return *ret;
+    return ret;
 }
 
 template <typename T>
@@ -226,10 +216,10 @@ void Set<T>::erase_impl(Node *node) {
 }
 
 template <typename T>
-typename Set<T>::iterator Set<T>::find(T const &element) {
+typename Set<T>::const_iterator Set<T>::find(T const &element) {
     Node* node = upper_lower_impl(element);
     if (node != nullptr && node->value() == element) {
-        return iterator(node);
+        return const_iterator(node);
     }
     else return end();
 }
@@ -246,11 +236,16 @@ typename Set<T>::const_iterator Set<T>::lower_bound(T const &element) const {
 }
 template <typename T>
 typename Set<T>::const_iterator Set<T>::upper_bound(T const &element) const {
+    if (element < begin_->value())
+        return begin();
+
     Node* node = upper_lower_impl(element);
-    if (node == nullptr || node == &top_node_ || element < begin_->value())
+
+
+    if (node == nullptr || node == &top_node_)
         return end();
 
-    if (node->value() == element)
+    if (node->value() <= element)
         return const_iterator(node->next());
     else return const_iterator(node);
 }
@@ -261,7 +256,6 @@ typename Set<T>::Node* Set<T>::upper_lower_impl(T const &element) const {
     if (node == nullptr)
         return nullptr;
 
-    Node* last;
     while (true) {
         if (node->value() == element)
             return node;
@@ -276,9 +270,6 @@ typename Set<T>::Node* Set<T>::upper_lower_impl(T const &element) const {
             else node = node->right;
         }
     }
-
-    while (node != begin_ && element < node->value())
-        node = node->prev();
 
     while (node != &top_node_ && node->value() < element) {
         Node *next = node->next();
@@ -374,10 +365,6 @@ struct Set<T>::Iterator {
     Iterator() {}
     Iterator(Iterator const&) = default;
     Iterator& operator=(Iterator const&) = default;
-    template <typename U>
-    Iterator(Iterator<U> const& other, typename
-        std::enable_if<std::is_same<U const, V>::value>::type* = nullptr) : node(other.node){}
-
 
     Iterator& operator++() {
         node = node->next();
