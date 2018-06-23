@@ -2,6 +2,7 @@
 #define SET_SET_H
 
 #include <iterator>
+#include <queue>
 
 template <typename T>
 struct Set {
@@ -68,6 +69,7 @@ private:
     Node* begin_ = &top_node_;
     Node* get_root() const { return top_node_.left; }
 
+    void build_impl(Node* root, Node* root_other);
     void clear_impl(Node *node);
     void erase_impl(Node* node);
     Node* upper_lower_impl (T const& element) const;
@@ -79,13 +81,42 @@ Set<T>::Set() noexcept {}
 template <typename T>
 Set<T>::Set(Set const& other) {
     try {
-        for (auto &a : other) {
-            insert(a);
+        if (other.top_node_.left) {
+            top_node_.left = new ValueNode(other.top_node_.left->value());
+            top_node_.left->parent = &top_node_;
+            build_impl(top_node_.left, other.top_node_.left);
         }
+        while (begin_->left)
+            begin_ = begin_->left;
     } catch (...) {
         clear();
         throw;
     }
+}
+
+template <typename T>
+void Set<T>::build_impl(Node *root, Node *root_other) {
+    std::queue<std::pair<Node *, Node* >> pairs;
+    pairs.push({root, root_other});
+
+    while (!pairs.empty()) {
+        Node* node = pairs.front().first;
+        Node* other = pairs.front().second;
+        pairs.pop();
+
+        if (other->left) {
+            node->left = new ValueNode(other->left->value());
+            node->left->parent = node;
+            pairs.push({node->left, other->left});
+        }
+
+        if (other->right) {
+            node->right = new ValueNode(other->right->value());
+            node->right->parent = node;
+            pairs.push({node->right, other->right});
+        }
+    }
+
 }
 
 template <typename T>
@@ -154,12 +185,10 @@ typename Set<T>::iterator Set<T>::erase(const_iterator it) {
         return end();
 
     Node* node = it.node;
-    iterator ret;
-    if (node->left != nullptr && node->right != nullptr)
-        ret = iterator(node);
-    else ret = iterator(node->next());
+    iterator ret(node->next());
 
     erase_impl(node);
+    delete node;
 
     return ret;
 }
@@ -179,7 +208,6 @@ void Set<T>::erase_impl(Node *node) {
             node->parent->left = nullptr;
         else node->parent->right = nullptr;
 
-        delete node;
         return;
     }
 
@@ -206,13 +234,27 @@ void Set<T>::erase_impl(Node *node) {
                 node->left->parent = node->parent;
             }
         }
-        delete node;
+
         return;
     }
 
     Node* next = node->next();
-    node->value() = next->value();
     erase_impl(next);
+
+    next->parent = node->parent;
+    if (node == node->parent->right)
+        node->parent->right = next;
+    else node->parent->left = next;
+
+    if (node->left) {
+        next->left = node->left;
+        node->left->parent = next;
+    }
+
+    if (node->right) {
+        next->right = node->right;
+        node->right->parent = next;
+    }
 }
 
 template <typename T>
